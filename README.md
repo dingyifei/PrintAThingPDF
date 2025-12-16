@@ -1,84 +1,134 @@
-# Label Processor - PrintAThing
+# pdfpipe
 
-This repository contains an example of using SumatraPDF and python to split and print PDFs downloaded from printathing.com for printing the shipping labels and packing sheets.
+A configurable PDF processing pipeline for splitting, transforming, and printing PDFs. Originally designed for PrintAThing.com shipping labels, but flexible enough for any PDF batch processing workflow.
 
-## Overview
-1. **pdf_splitter.py** - Splits a PDF file into two separate PDF files.
-2. **pdf_printer.py** - Prints a PDF file using a specified printer.
-3. **pdf_split_print_script.py** - Combines the functionalities of the splitter and printer to split a PDF and print the resulting files using different printers.
+## Features
 
-### Dependencies
-The programs rely on the following dependencies:
-- `SumatraPDF` - A free, open-source PDF viewer that can be used to print PDF files from the command line.
-- `PyPDF2` - A Python library for reading, writing, and splitting PDF files.
-- `pywin32` - A Python library for interacting with the Windows API, used for printer management.
+- **YAML Configuration**: Define processing pipelines in simple config files
+- **Page Selection**: Select pages by index, range, or pattern (`first`, `last`, `odd`, `even`)
+- **Transformations**: Rotate, crop, and resize pages with precise control
+- **Multi-Output**: Split one PDF into multiple outputs with different settings
+- **Batch Processing**: Process single files or entire directories
+- **Printing**: Send outputs to different printers with custom settings
+- **Dry Run**: Preview what will happen before processing
 
-To install these dependencies, you can use the following command:
-
-```sh
-pip install -r requirements.txt
-```
-
-Then place the `SumatraPDF.exe` portable executable in the same directory as the scripts.
-
-SumatraPDF Download: [SumatraPDF](https://www.sumatrapdfreader.org/free-pdf-reader.html)
-
-## Usage
-
-### 1. pdf_splitter.py
-The `pdf_splitter.py` script is used to split an input PDF into two separate files: the first PDF containing all pages except the last one, and the second PDF containing the rotated and cropped last page.
-
-**Usage**:
-```sh
-python pdf_splitter.py -i <input_pdf_path> -o1 <output_pdf1_path> -o2 <output_pdf2_path>
-```
-- `-i` or `--input`: Path to the input PDF file.
-- `-o1` or `--output1`: Path to save the first output PDF file.
-- `-o2` or `--output2`: Path to save the second output PDF file.
-
-### 2. pdf_printer.py
-The `pdf_printer.py` script allows printing a PDF file using a specified printer. It also supports listing available printers.
-
-**Usage**:
-
-To list all available printers:
-```sh
-python pdf_printer.py --list-printers
-```
-
-To print a PDF file:
-```sh
-python pdf_printer.py -p <printer_name> -i <input_pdf_path>
-```
-- `-p` or `--printer`: Name of the printer to use.
-- `-i` or `--input`: Path to the PDF file to print.
-
-### 3. pdf_split_print_script.py
-The `pdf_split_print_script.py` script combines the functionalities of the `pdf_splitter.py` and `pdf_printer.py` scripts. It takes a directory of PDF files, splits each PDF into two separate files, and then sends them to two different printers for printing.
-
-**Usage**:
-```sh
-python pdf_split_print_script.py -p1 <printer1_name> -p2 <printer2_name> -i <input_directory> -o <output_directory>
-```
-- `-p1` or `--printer1`: Name of the first printer to print the first split PDF.
-- `-p2` or `--printer2`: Name of the second printer to print the second split PDF.
-- `-i` or `--input`: Path to the directory containing input PDF files.
-- `-o` or `--output`: Path to the directory where split PDF files will be saved.
-
-### Example
-Suppose you have a folder of PDF files that need to be split and printed by two different printers. The `pdf_split_print_script.py` allows you to easily automate this task by running the following command:
+## Installation
 
 ```sh
-python pdf_split_print_script.py -p1 "Printer1" -p2 "Printer2" -i "input_pdfs" -o "output_pdfs"
-```
-This will split each PDF file in the `input_pdfs` directory and save the results in the `output_pdfs` directory, then print the first and second PDFs using `Printer1` and `Printer2` respectively.
+# Clone and install in development mode
+git clone https://github.com/your-repo/pdfpipe.git
+cd pdfpipe
+pip install -e .
 
-## Notes
-- **Windows Only**: The printer interaction is implemented using the `win32print` library, which is specific to Windows.
-- **SumatraPDF Required**: The `pdf_printer.py` script uses SumatraPDF to send print commands. Make sure SumatraPDF is installed and accessible from the command line.
+# Place SumatraPDF.exe in the project directory (required for printing)
+```
+
+Download SumatraPDF: [sumatrapdfreader.org](https://www.sumatrapdfreader.org/free-pdf-reader.html)
+
+## Quick Start
+
+```sh
+# List available printers
+pdfp --list-printers
+
+# Process PDFs with a config file
+pdfp -c configs/label_packing.yaml -i ./input -o ./output
+
+# Process a single file
+pdfp -c configs/label_packing.yaml -i document.pdf
+
+# Dry run (see what would happen)
+pdfp -c configs/label_packing.yaml -i ./input --dry-run
+
+# Validate a config file
+pdfp -c configs/label_packing.yaml --validate
+```
+
+## Configuration
+
+Create a YAML config file to define your processing pipeline:
+
+```yaml
+version: 1
+
+settings:
+  on_error: continue  # or "stop"
+  cleanup_source: false
+  cleanup_output_after_print: false
+
+outputs:
+  packing_sheet:
+    pages: "1--1"  # all pages except last
+    output_dir: ./output
+    filename_suffix: "_packing"
+    print:
+      enabled: true
+      printer: "Canon G3060 series"
+
+  label:
+    pages: "last"
+    transforms:
+      - rotate: 270
+      - crop:
+          lower_left: [82, 260]
+          upper_right: [514, 548]
+    output_dir: ./output
+    filename_suffix: "_label"
+    print:
+      enabled: true
+      printer: "Label Printer"
+```
+
+### Page Selection Syntax
+
+| Syntax | Meaning |
+|--------|---------|
+| `[1, 2, 3]` | Exact pages 1, 2, 3 |
+| `"1-3"` | Pages 1 through 3 |
+| `"3-"` | Page 3 to end |
+| `"-2"` | Last 2 pages |
+| `"1--1"` | Page 1 to second-to-last |
+| `"first"` | First page only |
+| `"last"` | Last page only |
+| `"odd"` | All odd-numbered pages |
+| `"even"` | All even-numbered pages |
+| `"all"` | All pages |
+
+### Transforms
+
+```yaml
+transforms:
+  # Rotate by degrees
+  - rotate: 270  # 0, 90, 180, 270
+
+  # Or rotate to orientation
+  - rotate: landscape  # landscape, portrait
+
+  # Crop to coordinates (in points, 72 per inch)
+  - crop:
+      lower_left: [0, 0]
+      upper_right: [288, 432]
+
+  # Resize with units
+  - size:
+      width: 100mm   # supports: mm, in, pt, cm
+      height: 150mm
+      fit: contain   # contain, cover, stretch
+```
+
+## Example Configs
+
+See the `configs/` directory for ready-to-use examples:
+
+- `label_packing.yaml` - Split PDFs into packing sheet + shipping label
+- `six_page.yaml` - Process 6-page PDFs (remove pages 1-2, rotate pages 4-5)
+
+## Requirements
+
+- Python 3.10+
+- Windows (for printing functionality)
+- SumatraPDF (for printing)
 
 ## License
-This project is licensed under the MIT License. Feel free to use and modify the code as needed.
 
-## Contact
-For any questions or issues, please contact the repository owner or create an issue in the repository.
+MIT License

@@ -1,0 +1,25 @@
+# Example: Process 6-page PDFs (remove pages 1-2, rotate pages 4-5)
+# Replicates the original pure_print_labels_and_packing_sheets.py workflow
+#
+# Usage:
+#   pdfp -c configs/six_page.yaml -i ./input -o ./output
+
+version: 1
+
+settings:
+  on_error: continue
+
+outputs:
+  processed:
+    # Keep pages 3, 4, 5, 6 (removes pages 1-2)
+    pages: [3, 4, 5, 6]
+    transforms:
+      # Rotate pages 4 and 5 (indices 1 and 2 in our selection)
+      - rotate:
+          pages: [1, 2]
+          angle: 270
+    output_dir: ./output
+    filename_prefix: "processed_"
+    print:
+      enabled: true
+      printer: "Canon G3060 series (Copy 1)"

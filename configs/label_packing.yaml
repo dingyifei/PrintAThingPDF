@@ -1,0 +1,34 @@
+# Example: Split PDF into packing sheet + shipping label
+# Replicates the original print_labels_and_packing_sheets.py workflow
+#
+# Usage:
+#   pdfp -c configs/label_packing.yaml -i ./input -o ./output
+
+version: 1
+
+settings:
+  on_error: continue
+
+outputs:
+  packing_sheet:
+    # All pages except the last one
+    pages: "1--1"
+    output_dir: ./output
+    filename_suffix: "_1"
+    print:
+      enabled: true
+      printer: "Canon G3060 series (Copy 1)"
+
+  label:
+    # Last page only, rotated and cropped for 4x6 label
+    pages: "last"
+    transforms:
+      - rotate: 270
+      - crop:
+          lower_left: [82, 260]
+          upper_right: [514, 548]
+    output_dir: ./output
+    filename_suffix: "_2"
+    print:
+      enabled: true
+      printer: "BY-480BT_BTH"

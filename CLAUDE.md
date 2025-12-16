@@ -4,57 +4,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Windows-only PDF processing tools for PrintAThing.com shipping labels. Splits multi-page PDFs, rotates/crops label pages, and prints to different printers via SumatraPDF.
+`pdfpipe` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize), and prints to different printers via SumatraPDF. Configured via YAML files.
 
 ## Setup
 
 ```sh
-# Uses conda environment
-conda activate PrintAThingPDF
+# Install package in development mode
+pip install -e .
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Place SumatraPDF.exe portable executable in the repository root
+# Place SumatraPDF.exe in the repository root for printing
 ```
 
-**Dependencies**: PyPDF2, pywin32, SumatraPDF (portable exe)
+**Dependencies**: PyPDF2, PyYAML, pywin32 (Windows only), SumatraPDF (portable exe)
 
 ## Commands
 
-List available printers:
 ```sh
-python pdf_printer.py --list-printers
-```
+# List available printers
+pdfp --list-printers
 
-Split and print PDFs to two printers (packing sheets + labels):
-```sh
-python print_labels_and_packing_sheets.py -p1 "<printer1>" -p2 "<printer2>" -i ./input -o ./output
-```
+# Process PDFs with a config
+pdfp -c configs/label_packing.yaml -i ./input -o ./output
 
-Process 6-page PDFs (removes pages 1-2, rotates pages 4-5, sends to single printer):
-```sh
-python pure_print_labels_and_packing_sheets.py -i ./input -o ./output -p "<printer>"
-```
+# Validate config only
+pdfp -c config.yaml --validate
 
-Split a single PDF into two files:
-```sh
-python pdf_splitter.py -i <input.pdf> -o1 <packing_sheet.pdf> -o2 <label.pdf>
+# Dry run (preview without processing)
+pdfp -c config.yaml -i ./input --dry-run
 ```
 
 ## Architecture
 
-- **pdf_splitter.py** - Core PDF splitting: separates pages, rotates last page 270°, crops to 4x6" label size. Exports `split_pdf()` function.
-- **pdf_printer.py** - Printer interface using win32print for enumeration, SumatraPDF subprocess for printing. Exports `list_printers()` and `print_pdf()` functions.
-- **print_labels_and_packing_sheets.py** - Batch processor: splits PDFs in input dir into `_1.pdf` (packing) and `_2.pdf` (label), sends to two different printers.
-- **pure_print_labels_and_packing_sheets.py** - Alternative processor for 6-page PDFs: removes pages 1-2, rotates pages 4-5 by 270°, outputs as `processed_*.pdf`.
+```
+src/pdfpipe/
+├── cli.py          # Entry point, argparse CLI
+├── config.py       # YAML config loading, dataclass models
+├── selector.py     # Page selection (patterns, ranges, indices)
+├── transforms.py   # Rotate, crop, resize operations
+├── printer.py      # SumatraPDF wrapper, printer enumeration
+└── processor.py    # Main pipeline orchestration
+```
 
-All scripts use argparse for CLI. The batch scripts import from `pdf_splitter` and `pdf_printer` modules.
+### Module Responsibilities
+
+- **cli.py** - Parses args, dispatches to processor or utility commands
+- **config.py** - Loads YAML, validates structure, returns typed `Config` dataclass
+- **selector.py** - Converts page specs (`"last"`, `"1-3"`, `[-1]`) to 0-indexed page list
+- **transforms.py** - Applies rotate/crop/resize to PyPDF2 page objects
+- **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args
+- **processor.py** - Orchestrates: load config → get files → select pages → transform → write → print
+
+## Config Structure
+
+```yaml
+version: 1
+settings:
+  on_error: continue|stop
+  cleanup_source: false
+  cleanup_output_after_print: false
+
+outputs:
+  profile_name:
+    pages: "last"           # Page selection spec
+    transforms: []          # List of transforms
+    output_dir: ./output
+    filename_prefix: ""
+    filename_suffix: ""
+    print:
+      enabled: true
+      printer: "Printer Name"
+      copies: 1
+      args: []              # Pass-through SumatraPDF args
+```
 
 ## Key Constants
 
-Label cropping coordinates in `pdf_splitter.py:24-25`:
-```python
-mediabox.lower_left = (82, 260)
-mediabox.upper_right = (514, 548)  # 4x6 inches at 72 DPI (432x288 points)
-```
+Default label cropping coordinates (4x6" at 72 DPI):
+- `lower_left: [82, 260]`
+- `upper_right: [514, 548]`

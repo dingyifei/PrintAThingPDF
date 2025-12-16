@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(pdfp:*)",
+      "Bash(pdfp --list-printers:*)"
+    ]
+  }
+}
